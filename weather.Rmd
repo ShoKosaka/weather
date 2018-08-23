@@ -1,0 +1,1166 @@
+---
+title: "weather"
+author: "Sho Kosaka"
+date: "2018年7月29日"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(summarytools)
+library(gghighlight)
+library(plotly)
+library(lattice)
+library(corrplot)
+library(randomForest)
+library(simputation)
+library(plotrix)
+```
+
+```{r}
+result_2006 <- read_csv("data/result_2006.csv", locale = locale(encoding = "cp932"))
+result_2007 <- read_csv("data/result_2007.csv", locale = locale(encoding = "cp932"))
+result_2008 <- read_csv("data/result_2008.csv", locale = locale(encoding = "cp932"))
+result_2009 <- read_csv("data/result_2009.csv", locale = locale(encoding = "cp932"))
+result_2010 <- read_csv("data/result_2010.csv", locale = locale(encoding = "cp932"))
+result_2011 <- read_csv("data/result_2011.csv", locale = locale(encoding = "cp932"))
+result_2012 <- read_csv("data/result_2012.csv", locale = locale(encoding = "cp932"))
+result_2013 <- read_csv("data/result_2013.csv", locale = locale(encoding = "cp932"))
+result_2014 <- read_csv("data/result_2014.csv", locale = locale(encoding = "cp932"))
+result_2015 <- read_csv("data/result_2015.csv", locale = locale(encoding = "cp932"))
+result_2016 <- read_csv("data/result_2016.csv", locale = locale(encoding = "cp932"))
+result_2017 <- read_csv("data/result_2017.csv", locale = locale(encoding = "cp932"))
+result_2018 <- read_csv("data/result_2018.csv", locale = locale(encoding = "cp932"))
+
+
+result <- rbind(result_2006, result_2007)
+result <- rbind(result, result_2008)
+result <- rbind(result, result_2009)
+result <- rbind(result, result_2010)
+result <- rbind(result, result_2011)
+result <- rbind(result, result_2012)
+result <- rbind(result, result_2013)
+result <- rbind(result, result_2014)
+result <- rbind(result, result_2015)
+result <- rbind(result, result_2016)
+result <- rbind(result, result_2017)
+result <- rbind(result, result_2018)
+
+forecast_2006_2015 <- read_csv("data/forecast_2006_2015.csv", locale = locale(encoding = "cp932"))
+forecast_2016 <- read_csv("data/forecast_2016.csv", locale = locale(encoding = "cp932"))
+forecast_2017 <- read_csv("data/forecast_2017.csv", locale = locale(encoding = "cp932"))
+forecast_201801 <- read_csv("data/forecast_201801.csv", locale = locale(encoding = "cp932"))
+forecast_201802 <- read_csv("data/forecast_201802.csv", locale = locale(encoding = "cp932"))
+forecast_201803 <- read_csv("data/forecast_201803.csv", locale = locale(encoding = "cp932"))
+forecast_201804 <- read_csv("data/forecast_201804.csv", locale = locale(encoding = "cp932"))
+forecast_201805 <- read_csv("data/forecast_201805.csv", locale = locale(encoding = "cp932"))
+forecast_201806 <- read_csv("data/forecast_201806.csv", locale = locale(encoding = "cp932"))
+#forecast_201807 <- read_csv("data/forecast_201807.csv", locale = locale(encoding = "cp932"))
+
+forecast_2018 <- rbind(forecast_201801, forecast_201802)
+forecast_2018 <- rbind(forecast_2018, forecast_201803)
+forecast_2018 <- rbind(forecast_2018, forecast_201804)
+forecast_2018 <- rbind(forecast_2018, forecast_201805)
+forecast_2018 <- rbind(forecast_2018, forecast_201806)
+#forecast_2018 <- rbind(forecast_2018, forecast_201807)
+
+forecast_2016$year <- 2016
+forecast_2017$year <- 2017
+forecast_2018$year <- 2018
+
+forecast <- rbind(forecast_2016, forecast_2017)
+forecast <- rbind(forecast, forecast_2018)
+
+result <- result[, c("年月日", "曜日", "平均気温(℃)", "最高気温(℃)","最低気温(℃)",
+                     "降水量の合計(mm)","降水量の合計(mm)_1","日照時間(時間)","日照時間(時間)_1",
+                     "降雪量合計(cm)","降雪量合計(cm)_1","平均雲量(10分比)","天気概況(昼：06時～18時)",
+                     "天気概況(夜：18時～翌日06時)" )]
+
+names(result) <- c("date", "weekday", "re_mean_temp", "re_max_temp", "re_min_temp", "re_rain_mm", "re_rain_01",
+                   "re_sun_hr", "re_sun_01", "re_snow_cm", "re_snow_01", "re_mean_cloud",
+                   "re_weather_0618", "re_weather_1806")
+
+names(forecast) <- c("month", "day", "for_weather_1", "for_max_temp_1", "for_min_temp_1", "for_rain_1_0006",
+                     "for_rain_1_0612", "for_rain_1_1218", "for_rain_1_1824",
+                     "for_weather_2", "for_max_temp_2", "for_min_temp_2", "for_rain_2",
+                     "for_weather_3", "for_max_temp_3", "for_min_temp_3", "for_rain_3",
+                     "for_weather_4", "for_max_temp_4", "for_min_temp_4", "for_rain_4",
+                     "for_weather_5", "for_max_temp_5", "for_min_temp_5", "for_rain_5",
+                     "for_weather_6", "for_max_temp_6", "for_min_temp_6", "for_rain_6",
+                     "for_weather_7", "for_max_temp_7", "for_min_temp_7", "for_rain_7","year")
+
+forecast$date <- paste(forecast$year, forecast$month, forecast$day, sep = "/")
+
+forecast <- forecast[, c("date", "for_weather_1", "for_max_temp_1", "for_min_temp_1", "for_rain_1_0006",
+                     "for_rain_1_0612", "for_rain_1_1218", "for_rain_1_1824",
+                     "for_weather_2", "for_max_temp_2", "for_min_temp_2", "for_rain_2",
+                     "for_weather_3", "for_max_temp_3", "for_min_temp_3", "for_rain_3",
+                     "for_weather_4", "for_max_temp_4", "for_min_temp_4", "for_rain_4",
+                     "for_weather_5", "for_max_temp_5", "for_min_temp_5", "for_rain_5",
+                     "for_weather_6", "for_max_temp_6", "for_min_temp_6", "for_rain_6",
+                     "for_weather_7", "for_max_temp_7", "for_min_temp_7", "for_rain_7")]
+
+names(forecast_2006_2015) <- c("year", "month", "day",
+                     "for_weather_1", "for_max_temp_1", "for_min_temp_1", "for_rain_1_0006",
+                     "for_rain_1_0612", "for_rain_1_1218", "for_rain_1_1824",
+                     "for_weather_2", "for_max_temp_2", "for_min_temp_2", "for_rain_2",
+                     "for_weather_3", "for_max_temp_3", "for_min_temp_3", "for_rain_3",
+                     "for_weather_4", "for_max_temp_4", "for_min_temp_4", "for_rain_4",
+                     "for_weather_5", "for_max_temp_5", "for_min_temp_5", "for_rain_5",
+                     "for_weather_6", "for_max_temp_6", "for_min_temp_6", "for_rain_6",
+                     "for_weather_7", "for_max_temp_7", "for_min_temp_7", "for_rain_7")
+
+forecast_2006_2015$date <- paste(forecast_2006_2015$year, forecast_2006_2015$month, forecast_2006_2015$day, sep = "/")
+
+forecast_2006_2015 <- forecast_2006_2015[, c("date",
+                     "for_weather_1", "for_max_temp_1", "for_min_temp_1", "for_rain_1_0006",
+                     "for_rain_1_0612", "for_rain_1_1218", "for_rain_1_1824",
+                     "for_weather_2", "for_max_temp_2", "for_min_temp_2", "for_rain_2",
+                     "for_weather_3", "for_max_temp_3", "for_min_temp_3", "for_rain_3",
+                     "for_weather_4", "for_max_temp_4", "for_min_temp_4", "for_rain_4",
+                     "for_weather_5", "for_max_temp_5", "for_min_temp_5", "for_rain_5",
+                     "for_weather_6", "for_max_temp_6", "for_min_temp_6", "for_rain_6",
+                     "for_weather_7", "for_max_temp_7", "for_min_temp_7", "for_rain_7")]
+
+forecast <- rbind(forecast_2006_2015, forecast)
+```
+
+```{r}
+result <- result[, c("年月日", "曜日", "平均気温(℃)", "最高気温(℃)", "最高気温(℃)_2" ,"最低気温(℃)",
+                    "最低気温(℃)_2", "降水量の合計(mm)","降水量の合計(mm)_1","日照時間(時間)","日照時間(時間)_1",
+                     "降雪量合計(cm)","降雪量合計(cm)_1","平均雲量(10分比)","天気概況(昼：06時～18時)",
+                     "天気概況(夜：18時～翌日06時)" ,
+                    "平均風速(m/s)" ,"最大風速(m/s)", "最大風速(m/s)_2", "最大風速(m/s)_4",
+                    "最大瞬間風速(m/s)", "最大瞬間風速(m/s)_2", "最大瞬間風速(m/s)_4",
+                    "平均蒸気圧(hPa)", "平均湿度(％)", "最小相対湿度(％)", "最小相対湿度(％)_2")]
+
+names(result) <- c("date", "weekday", "re_mean_temp", "re_max_temp", "re_max_temp_time",
+                   "re_min_temp", "re_min_temp_time", "re_rain_mm", "re_rain_01",
+                   "re_sun_hr", "re_sun_01", "re_snow_cm", "re_snow_01", "re_mean_cloud",
+                   "re_weather_0618", "re_weather_1806",
+                   "re_mean_wind", "re_max_wind", "re_max_wind_time", "re_max_wind_angle",
+                   "re_moment_max_wind", "re_moment_max_wind_time", "re_moment_max_wind_angle",
+                   "re_mean_hpa", "re_mean_moisture", "re_min_relative_moisture", "re_min_relative_moisture_time")
+```
+
+```{r}
+df <- merge(result, forecast, by = "date", all.x = TRUE)
+
+df$date <- as.Date(df$date)
+df$re_max_temp_time <- as.POSIXct(df$re_max_temp_time)
+df$re_min_temp_time <- as.POSIXct(df$re_min_temp_time)
+df$re_max_wind_time <- as.POSIXct(df$re_max_wind_time)
+df$re_moment_max_wind_time <- as.POSIXct(df$re_moment_max_wind_time)
+df$re_min_relative_moisture_time <- as.POSIXct(df$re_min_relative_moisture_time)
+
+df$re_rain_01 <- ifelse(df$re_rain_mm > 0 , 1, 0)
+
+df <- df %>%
+  arrange(date)
+
+df$re_max_wind_angle <- gsub(")", "", df$re_max_wind_angle)
+df$re_max_wind_angle <- gsub("]", "", df$re_max_wind_angle)
+
+df$re_moment_max_wind_angle <- gsub(")", "", df$re_moment_max_wind_angle)
+df$re_moment_max_wind_angle <- gsub("]", "", df$re_moment_max_wind_angle)
+
+df$for_max_temp_1 <- gsub("℃", "", df$for_max_temp_1)
+df$for_max_temp_1 <- as.integer(df$for_max_temp_1)
+df$for_max_temp_2 <- gsub("℃", "", df$for_max_temp_2)
+df$for_max_temp_2 <- as.integer(df$for_max_temp_2)
+df$for_max_temp_3 <- gsub("℃", "", df$for_max_temp_3)
+df$for_max_temp_3 <- as.integer(df$for_max_temp_3)
+df$for_max_temp_4 <- gsub("℃", "", df$for_max_temp_4)
+df$for_max_temp_4 <- as.integer(df$for_max_temp_4)
+df$for_max_temp_5 <- gsub("℃", "", df$for_max_temp_5)
+df$for_max_temp_5 <- as.integer(df$for_max_temp_5)
+df$for_max_temp_6 <- gsub("℃", "", df$for_max_temp_6)
+df$for_max_temp_6 <- as.integer(df$for_max_temp_6)
+df$for_max_temp_7 <- gsub("℃", "", df$for_max_temp_7)
+df$for_max_temp_7 <- as.integer(df$for_max_temp_7)
+
+df$for_min_temp_1 <- gsub("℃", "", df$for_min_temp_1)
+df$for_min_temp_1 <- as.integer(df$for_min_temp_1)
+df$for_min_temp_2 <- gsub("℃", "", df$for_min_temp_2)
+df$for_min_temp_2 <- as.integer(df$for_min_temp_2)
+df$for_min_temp_3 <- gsub("℃", "", df$for_min_temp_3)
+df$for_min_temp_3 <- as.integer(df$for_min_temp_3)
+df$for_min_temp_4 <- gsub("℃", "", df$for_min_temp_4)
+df$for_min_temp_4 <- as.integer(df$for_min_temp_4)
+df$for_min_temp_5 <- gsub("℃", "", df$for_min_temp_5)
+df$for_min_temp_5 <- as.integer(df$for_min_temp_5)
+df$for_min_temp_6 <- gsub("℃", "", df$for_min_temp_6)
+df$for_min_temp_6 <- as.integer(df$for_min_temp_6)
+df$for_min_temp_7 <- gsub("℃", "", df$for_min_temp_7)
+df$for_min_temp_7 <- as.integer(df$for_min_temp_7)
+
+df$for_rain_1_0006 <- gsub("%", "", df$for_rain_1_0006)
+df$for_rain_1_0006 <- gsub("％", "", df$for_rain_1_0006)
+df$for_rain_1_0006 <- as.numeric(df$for_rain_1_0006) / 100
+df$for_rain_1_0612 <- gsub("%", "", df$for_rain_1_0612)
+df$for_rain_1_0612 <- gsub("％", "", df$for_rain_1_0612)
+df$for_rain_1_0612 <- as.numeric(df$for_rain_1_0612) / 100
+df$for_rain_1_1218 <- gsub("%", "", df$for_rain_1_1218)
+df$for_rain_1_1218 <- gsub("％", "", df$for_rain_1_1218)
+df$for_rain_1_1218 <- as.numeric(df$for_rain_1_1218) / 100
+df$for_rain_1_1824 <- gsub("%", "", df$for_rain_1_1824)
+df$for_rain_1_1824 <- gsub("％", "", df$for_rain_1_1824)
+df$for_rain_1_1824 <- as.numeric(df$for_rain_1_1824) / 100
+df$for_rain_2 <- gsub("%", "", df$for_rain_2)
+df$for_rain_2 <- gsub("％", "", df$for_rain_2)
+df$for_rain_2 <- as.numeric(df$for_rain_2) / 100
+df$for_rain_3 <- gsub("%", "", df$for_rain_3)
+df$for_rain_3 <- gsub("％", "", df$for_rain_3)
+df$for_rain_3 <- as.numeric(df$for_rain_3) / 100
+df$for_rain_4 <- gsub("%", "", df$for_rain_4)
+df$for_rain_4 <- gsub("％", "", df$for_rain_4)
+df$for_rain_4 <- as.numeric(df$for_rain_4) / 100
+df$for_rain_5 <- gsub("%", "", df$for_rain_5)
+df$for_rain_5 <- gsub("％", "", df$for_rain_5)
+df$for_rain_5 <- as.numeric(df$for_rain_5) / 100
+df$for_rain_6 <- gsub("%", "", df$for_rain_6)
+df$for_rain_6 <- gsub("％", "", df$for_rain_6)
+df$for_rain_6 <- as.numeric(df$for_rain_6) / 100
+df$for_rain_7 <- gsub("%", "", df$for_rain_7)
+df$for_rain_7 <- gsub("％", "", df$for_rain_7)
+df$for_rain_7 <- as.numeric(df$for_rain_7) / 100
+
+df$for_rain_1 <- apply(df[,c("for_rain_1_0006", "for_rain_1_0612", "for_rain_1_1218", "for_rain_1_1824")], 1, max)
+
+df$year <- str_split(df$date, "-", simplify = TRUE)[,1]
+df$month <- str_split(df$date, "-", simplify = TRUE)[,2]
+df$day <- str_split(df$date, "-", simplify = TRUE)[,3]
+
+df$season <- ifelse(((df$month == "03") | (df$month == "04") | (df$month == "05")), "spring",
+             ifelse(((df$month == "06") | (df$month == "07") | (df$month == "08")), "summer",
+             ifelse(((df$month == "09") | (df$month == "10") | (df$month == "11")), "fall", "winter"
+                    )))
+```
+
+```{r}
+df_rain_1_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_1)
+
+df_rain_1_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_1)
+
+df_rain_1 <- merge(df_rain_1_0, df_rain_1_1, by = "for_rain_1", all = TRUE)
+names(df_rain_1) <- c("for_rain", "no_rain_1", "rain_1")
+
+df_rain_2_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_2)
+
+df_rain_2_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_2)
+
+df_rain_2 <- merge(df_rain_2_0, df_rain_2_1, by = "for_rain_2", all = TRUE)
+names(df_rain_2) <- c("for_rain", "no_rain_2", "rain_2")
+
+df_rain_3_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_3)
+
+df_rain_3_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_3)
+
+df_rain_3 <- merge(df_rain_3_0, df_rain_3_1, by = "for_rain_3", all = TRUE)
+names(df_rain_3) <- c("for_rain", "no_rain_3", "rain_3")
+
+df_rain_4_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_4)
+
+df_rain_4_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_4)
+
+df_rain_4 <- merge(df_rain_4_0, df_rain_4_1, by = "for_rain_4", all = TRUE)
+names(df_rain_4) <- c("for_rain", "no_rain_4", "rain_4")
+
+df_rain_5_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_5)
+
+df_rain_5_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_5)
+
+df_rain_5 <- merge(df_rain_5_0, df_rain_5_1, by = "for_rain_5", all = TRUE)
+names(df_rain_5) <- c("for_rain", "no_rain_5", "rain_5")
+
+df_rain_6_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_6)
+
+df_rain_6_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_6)
+
+df_rain_6 <- merge(df_rain_6_0, df_rain_6_1, by = "for_rain_6", all = TRUE)
+names(df_rain_6) <- c("for_rain", "no_rain_6", "rain_6")
+
+df_rain_7_1 <- df %>%
+  filter(re_rain_01 == 1) %>% 
+  count(for_rain_7)
+
+df_rain_7_0 <- df %>%
+  filter(re_rain_01 == 0) %>% 
+  count(for_rain_7)
+
+df_rain_7 <- merge(df_rain_7_0, df_rain_7_1, by = "for_rain_7", all = TRUE)
+names(df_rain_7) <- c("for_rain", "no_rain_7", "rain_7")
+
+df_rain <- merge(df_rain_1, df_rain_2, by = "for_rain", all = TRUE)
+df_rain <- merge(df_rain, df_rain_3, by = "for_rain", all = TRUE)
+df_rain <- merge(df_rain, df_rain_4, by = "for_rain", all = TRUE)
+df_rain <- merge(df_rain, df_rain_5, by = "for_rain", all = TRUE)
+df_rain <- merge(df_rain, df_rain_6, by = "for_rain", all = TRUE)
+df_rain <- merge(df_rain, df_rain_7, by = "for_rain", all = TRUE)
+
+df_rain <- df_rain %>% 
+  filter(!is.na(for_rain))
+
+df_rain[is.na(df_rain)] <- 0
+
+df_rain$rain_rate_1 <- df_rain$rain_1 / (df_rain$rain_1 + df_rain$no_rain_1)
+df_rain$rain_rate_2 <- df_rain$rain_2 / (df_rain$rain_2 + df_rain$no_rain_2)
+df_rain$rain_rate_3 <- df_rain$rain_3 / (df_rain$rain_3 + df_rain$no_rain_3)
+df_rain$rain_rate_4 <- df_rain$rain_4 / (df_rain$rain_4 + df_rain$no_rain_4)
+df_rain$rain_rate_5 <- df_rain$rain_5 / (df_rain$rain_5 + df_rain$no_rain_5)
+df_rain$rain_rate_6 <- df_rain$rain_6 / (df_rain$rain_6 + df_rain$no_rain_6)
+df_rain$rain_rate_7 <- df_rain$rain_7 / (df_rain$rain_7 + df_rain$no_rain_7)
+df_rain <- df_rain[, c("for_rain", "rain_rate_1", "rain_rate_2", "rain_rate_3", "rain_rate_4", "rain_rate_5", 
+                       "rain_rate_6", "rain_rate_7")]
+df_rain_gather <- df_rain %>% 
+  gather(rain_rate, percent, rain_rate_1, rain_rate_2, rain_rate_3, rain_rate_4,
+         rain_rate_5, rain_rate_6, rain_rate_7)
+```
+
+```{r}
+df_rain_gather1 <- df_rain %>% 
+  gather(rain_rate, percent, rain_rate_1)
+
+df_rain_gather1 %>% 
+  ggplot() +
+  geom_line(aes(x = for_rain, y = percent, color = rain_rate)) +
+  xlab("前日の降水確率") +
+  ylab("実際に雨が降った割合") +
+  ggtitle("前日の降水確率と実際に雨が降った割合") +
+  scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  theme(legend.position = 'none') +
+  #scale_color_hue(name = "", labels = c(rain_rate_1 = "前日の天気予報", rain_rate_2 ="2日前の天気予報",
+  #                                      rain_rate_3 = "3日前の天気予報", rain_rate_4 ="4日前の天気予報",
+  #                                      rain_rate_5 = "5日前の天気予報", rain_rate_6 ="6日前の天気予報",
+  #                                      rain_rate_7 = "7日前の天気予報") ) +
+  geom_abline(intercept=0,slope=1) +
+  annotate("text",label="y==x",x=0.7,y=0.6, parse=TRUE)
+```
+
+```{r}
+df_rain_gather %>% 
+  ggplot() +
+  geom_line(aes(x = for_rain, y = percent, color = rain_rate)) +
+  xlab("降水確率") +
+  ylab("実際に雨が降った割合") +
+  ggtitle("降水確率と実際に雨が降った割合") +
+  scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_color_hue(name = "", labels = c(rain_rate_1 = "前日の天気予報", rain_rate_2 ="2日前の天気予報",
+                                        rain_rate_3 = "3日前の天気予報", rain_rate_4 ="4日前の天気予報",
+                                        rain_rate_5 = "5日前の天気予報", rain_rate_6 ="6日前の天気予報",
+                                        rain_rate_7 = "7日前の天気予報") ) +
+  geom_abline(intercept=0,slope=1) +
+  annotate("text",label="y==x",x=0.7,y=0.6, parse=TRUE)
+```
+
+```{r}
+df_rain_forecast <- df[, c("for_rain_1", "for_rain_2", "for_rain_3", "for_rain_4",
+                           "for_rain_5", "for_rain_6", "for_rain_7")]
+
+df_rain_forecast_gather <- df_rain_forecast %>% 
+  gather(rain_rate, percent, for_rain_1, for_rain_2, for_rain_3, for_rain_4, 
+         for_rain_5, for_rain_6, for_rain_7)
+
+df_rain_forecast_gather$day <- rep(seq(1:nrow(df_rain_forecast)), 7)
+
+df_rain_forecast_gather <- df_rain_forecast_gather %>% 
+  arrange(day)
+
+df_rain_forecast_gather$idx <- rep(seq(1:7), nrow(df_rain_forecast))
+
+df_rain_forecast_gather$day <- as.character(df_rain_forecast_gather$day)
+
+df_rain_forecast_gather %>%
+  ggplot() +
+  geom_line(aes(idx, percent, color = day, alpha = 0.2)) +
+  theme(legend.position = 'none') +
+  gghighlight(max_highlight = 10, max(percent) == 1, label_params = "")
+```
+
+```{r}
+df_rain_forecast %>%
+  count(for_rain_1, for_rain_7) %>%
+  ggplot() +
+  geom_point(aes(for_rain_7, for_rain_1, size = n)) +
+  xlab("7日前の降水確率") +
+  ylab("前日の降水確率") +
+  scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1))
+```
+
+```{r}
+df_rain_forecast_1_7 <- df_rain_forecast %>%
+  count(for_rain_1, for_rain_7)
+
+df_rain_forecast_1_7_rev <- read_csv("data/df_rain_forecast_1_7_rev.csv")
+
+df_rain_forecast_1_7_mx <- matrix(df_rain_forecast_1_7_rev$n, nrow = 7, ncol = 11)
+
+df_rain_forecast_1_7_df <- as.data.frame(df_rain_forecast_1_7_mx)
+
+rownames(df_rain_forecast_1_7_df) <- c("10%", "20%", "30%", "40%", "50%", "60%", "70%")
+colnames(df_rain_forecast_1_7_df) <- c("0%", "10%", "20%", "30%", "40%", "50%", "60%",
+                                       "70%", "80%", "90%", "100%")
+
+df_rain_forecast_1_7_df_scale <- as.data.frame(t(df_rain_forecast_1_7_df))
+
+df_rain_forecast_1_7_df_scale$`10%` <- df_rain_forecast_1_7_df_scale$`10%`/sum(df_rain_forecast_1_7_df_scale$`10%`)
+df_rain_forecast_1_7_df_scale$`20%` <- df_rain_forecast_1_7_df_scale$`20%`/sum(df_rain_forecast_1_7_df_scale$`20%`)
+df_rain_forecast_1_7_df_scale$`30%` <- df_rain_forecast_1_7_df_scale$`30%`/sum(df_rain_forecast_1_7_df_scale$`30%`)
+df_rain_forecast_1_7_df_scale$`40%` <- df_rain_forecast_1_7_df_scale$`40%`/sum(df_rain_forecast_1_7_df_scale$`40%`)
+df_rain_forecast_1_7_df_scale$`50%` <- df_rain_forecast_1_7_df_scale$`50%`/sum(df_rain_forecast_1_7_df_scale$`50%`)
+df_rain_forecast_1_7_df_scale$`60%` <- df_rain_forecast_1_7_df_scale$`60%`/sum(df_rain_forecast_1_7_df_scale$`60%`)
+df_rain_forecast_1_7_df_scale$`70%` <- df_rain_forecast_1_7_df_scale$`70%`/sum(df_rain_forecast_1_7_df_scale$`70%`)
+
+brks <- seq(0, 0.5, 0.05)
+levelplot(as.matrix(t(df_rain_forecast_1_7_df_scale)), at = brks, xlab = "7日前の降水確率", ylab = "前日の降水確率",
+          main = "7日前の降水確率と前日の降水確率　比較")
+```
+
+```{r}
+df %>%
+  filter(re_rain_01 == 0) %>%
+  ggplot(aes(re_mean_moisture, re_mean_temp, color = season, alpha = 0.1)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+df %>%
+  #filter(re_rain_01 == 0) %>%
+  ggplot(aes(re_mean_moisture, re_mean_temp, color = season, alpha = 0.1)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+df %>%
+  ggplot(aes(season, re_mean_temp, color = as.factor(re_rain_01))) +
+  geom_boxplot(outlier.shape = NA)
+```
+
+```{r}
+df %>%
+  filter(month == "07") %>%
+  ggplot(aes(year, re_mean_temp)) +
+  geom_boxplot(outlier.shape = NA)
+```
+
+```{r}
+df %>%
+  filter(month == "07") %>%
+  ggplot(aes(year, re_mean_wind)) +
+  geom_boxplot(outlier.shape = NA)
+```
+
+```{r}
+df %>%
+  #filter(month == "07") %>%
+  ggplot(aes(re_sun_hr, re_mean_temp, color = season)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+df %>%
+  filter(month == "07") %>%
+  ggplot(aes(re_sun_hr, re_mean_temp)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+df %>%
+  filter(month == "07") %>%
+  ggplot(aes(re_mean_cloud, re_sun_hr)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+df %>%
+  select(re_mean_temp, re_rain_mm, re_sun_hr, re_mean_cloud, re_max_wind, re_mean_hpa, re_mean_moisture) %>%
+  cor() %>%
+  corrplot(method = "color", type = "upper", tl.srt = 45, addCoef.col = "darkgray", tl.col = "black",
+           diag = FALSE)
+```
+
+
+```{r}
+df %>%
+  filter(month == "07") %>%
+  select(re_mean_temp, re_rain_mm, re_sun_hr, re_mean_cloud, re_max_wind, re_mean_hpa, re_mean_moisture) %>%
+  cor() %>%
+  corrplot(method = "color", type = "upper", tl.srt = 45, addCoef.col = "darkgray", tl.col = "black",
+           diag = FALSE)
+```
+
+```{r}
+df_today <- df %>%
+  select(date, weekday, re_mean_temp, re_max_temp, re_max_temp_time, re_min_temp, re_min_temp_time,
+         re_rain_mm, re_rain_01, re_sun_hr, re_sun_01, re_snow_cm, re_snow_01, re_mean_cloud,
+         re_weather_0618, re_weather_1806, re_mean_wind, re_max_wind, re_max_wind_time,
+         re_max_wind_angle, re_moment_max_wind, re_moment_max_wind_time, re_moment_max_wind_angle,
+         re_mean_hpa, re_mean_moisture, re_min_relative_moisture, re_min_relative_moisture_time)
+
+df_yesterday <- df_today %>%
+  filter(date != "2006-01-01") %>%
+  filter(date != "2018-07-30") %>%
+  select(re_mean_temp, re_max_temp, re_max_temp_time, re_min_temp, re_min_temp_time,
+         re_rain_mm, re_rain_01, re_sun_hr, re_sun_01, re_snow_cm, re_snow_01, re_mean_cloud,
+         re_weather_0618, re_weather_1806, re_mean_wind, re_max_wind, re_max_wind_time,
+         re_max_wind_angle, re_moment_max_wind, re_moment_max_wind_time, re_moment_max_wind_angle,
+         re_mean_hpa, re_mean_moisture, re_min_relative_moisture, re_min_relative_moisture_time)
+
+df_2daysago <- df_today %>%
+  filter(date != "2018-07-29") %>%
+  filter(date != "2018-07-30") %>%
+  select(re_mean_temp, re_max_temp, re_max_temp_time, re_min_temp, re_min_temp_time,
+         re_rain_mm, re_rain_01, re_sun_hr, re_sun_01, re_snow_cm, re_snow_01, re_mean_cloud,
+         re_weather_0618, re_weather_1806, re_mean_wind, re_max_wind, re_max_wind_time,
+         re_max_wind_angle, re_moment_max_wind, re_moment_max_wind_time, re_moment_max_wind_angle,
+         re_mean_hpa, re_mean_moisture, re_min_relative_moisture, re_min_relative_moisture_time)
+
+df_today <- df_today %>%
+  filter(date != "2006-01-01") %>%
+  filter(date != "2006-01-02")
+
+colnames(df_yesterday) <- c("yes_mean_temp", "yes_max_temp", "yes_max_temp_time", "yes_min_temp", "yes_min_temp_time",
+         "yes_rain_mm", "yes_rain_01", "yes_sun_hr", "yes_sun_01", "yes_snow_cm", "yes_snow_01", "yes_mean_cloud",
+         "yes_weather_0618", "yes_weather_1806", "yes_mean_wind", "yes_max_wind", "yes_max_wind_time",
+         "yes_max_wind_angle", "yes_moment_max_wind", "yes_moment_max_wind_time", "yes_moment_max_wind_angle",
+         "yes_mean_hpa", "yes_mean_moisture", "yes_min_relative_moisture", "yes_min_relative_moisture_time")
+
+colnames(df_2daysago) <- c("two_mean_temp", "two_max_temp", "two_max_temp_time", "two_min_temp", "two_min_temp_time",
+         "two_rain_mm", "two_rain_01", "two_sun_hr", "two_sun_01", "two_snow_cm", "two_snow_01", "two_mean_cloud",
+         "two_weather_0618", "two_weather_1806", "two_mean_wind", "two_max_wind", "two_max_wind_time",
+         "two_max_wind_angle", "two_moment_max_wind", "two_moment_max_wind_time", "two_moment_max_wind_angle",
+         "two_mean_hpa", "two_mean_moisture", "two_min_relative_moisture", "two_min_relative_moisture_time")
+
+df_result <- cbind(df_today, df_yesterday)
+df_result <- cbind(df_result, df_2daysago)
+```
+
+```{r}
+df_rf <- df_result %>%
+  select(re_rain_01, yes_mean_temp, 
+         yes_rain_mm, yes_rain_01, yes_sun_hr, yes_snow_cm, yes_snow_01, yes_mean_cloud,
+         yes_mean_wind, yes_max_wind, 
+         yes_max_wind_angle, yes_moment_max_wind, yes_moment_max_wind_angle,
+         yes_mean_hpa, yes_mean_moisture
+         #yes_max_temp, yes_max_temp_time, yes_min_temp, yes_min_temp_time,yes_max_wind_time,yes_moment_max_wind_time,
+         #yes_min_relative_moisture, yes_min_relative_moisture_time, yes_sun_01
+         )
+
+df_rf <- impute_lm(df_rf, yes_mean_wind ~ yes_max_wind + yes_rain_mm + yes_sun_hr + yes_mean_cloud + yes_mean_hpa)
+
+df_rf$re_rain_01 <- as.factor(df_rf$re_rain_01)
+df_rf$yes_rain_01 <- as.factor(df_rf$yes_rain_01)
+#df_rf$yes_sun_01 <- as.factor(df_rf$yes_sun_01)
+df_rf$yes_snow_01 <- as.factor(df_rf$yes_snow_01)
+df_rf$yes_max_wind_angle <- as.factor(df_rf$yes_max_wind_angle)
+df_rf$yes_moment_max_wind_angle <- as.factor(df_rf$yes_moment_max_wind_angle)
+#df_rf$yes_weather_0618 <- as.factor(df_rf$yes_weather_0618)
+#df_rf$yes_weather_1806 <- as.factor(df_rf$yes_weather_1806)
+
+#names(df_rf) <- c("re_rain_01", "平均気温", "降水量_mm", "降水有無", "日照時間_hr",
+#                  "降雪量_cm", "降雪有無", "平均雲量", "平均風速",
+#                  "最大風速", "最大風速_風向き", "最大瞬間風速", "最大瞬間風速_風向き",
+#                  "平均蒸気圧", "平均相対湿度")
+
+df_rf$yes_moment_max_wind_bin <- cut_width(df_rf$yes_moment_max_wind, width = 10, boundary = 0)
+
+tuneRF(df_rf[, -1], df_rf[, 1], doBest=TRUE)
+
+set.seed(1234)
+smp_size <- floor(0.75 * nrow(df_rf))
+train_ind <- sample(seq_len(nrow(df_rf)), size = smp_size)
+
+df_rf_train <- df_rf[train_ind, ]
+df_rf_test <- df_rf[-train_ind, ]
+
+df_rf_predict <- randomForest(re_rain_01 ~., df_rf_train, mtry=2)
+
+plot(df_rf_predict)
+```
+
+```{r}
+varImpPlot(df_rf_predict, main = "ランダムフォレストによる変数重要度")
+```
+
+```{r}
+table(predict(df_rf_predict, df_rf_test[,-1]), df_rf_test$re_rain_01)
+```
+
+```{r}
+df_rf_selected <- df_result %>%
+  select(re_rain_01, 
+         #yes_mean_temp, 
+         #yes_rain_mm, yes_rain_01, yes_sun_hr, yes_snow_cm, yes_snow_01, 
+         #yes_mean_cloud,
+         #yes_mean_wind, yes_max_wind, 
+         #yes_max_wind_angle, 
+         yes_moment_max_wind, yes_moment_max_wind_angle,
+         #yes_mean_hpa, 
+         yes_mean_moisture
+         #yes_max_temp, yes_max_temp_time, yes_min_temp, yes_min_temp_time,yes_max_wind_time,yes_moment_max_wind_time,
+         #yes_min_relative_moisture, yes_min_relative_moisture_time, yes_sun_01
+         )
+
+#df_rf_selected <- impute_lm(df_rf_selected, yes_mean_wind ~ yes_max_wind + yes_rain_mm + yes_sun_hr + yes_mean_cloud + yes_mean_hpa)
+
+df_rf_selected$re_rain_01 <- as.factor(df_rf_selected$re_rain_01)
+#df_rf$yes_rain_01 <- as.factor(df_rf$yes_rain_01)
+#df_rf$yes_sun_01 <- as.factor(df_rf$yes_sun_01)
+#df_rf$yes_snow_01 <- as.factor(df_rf$yes_snow_01)
+#df_rf$yes_max_wind_angle <- as.factor(df_rf$yes_max_wind_angle)
+df_rf_selected$yes_moment_max_wind_angle <- as.factor(df_rf_selected$yes_moment_max_wind_angle)
+#df_rf$yes_weather_0618 <- as.factor(df_rf$yes_weather_0618)
+#df_rf$yes_weather_1806 <- as.factor(df_rf$yes_weather_1806)
+
+#names(df_rf) <- c("re_rain_01", "平均気温", "降水量_mm", "降水有無", "日照時間_hr",
+#                  "降雪量_cm", "降雪有無", "平均雲量", "平均風速",
+#                  "最大風速", "最大風速_風向き", "最大瞬間風速", "最大瞬間風速_風向き",
+#                  "平均蒸気圧", "平均相対湿度")
+
+#df_rf$yes_moment_max_wind_bin <- cut_width(df_rf$yes_moment_max_wind, width = 10, boundary = 0)
+
+tuneRF(df_rf_selected[, -1], df_rf_selected[, 1], doBest=TRUE)
+
+set.seed(1234)
+smp_size <- floor(0.75 * nrow(df_rf_selected))
+train_ind <- sample(seq_len(nrow(df_rf_selected)), size = smp_size)
+
+df_rf_selected_train <- df_rf_selected[train_ind, ]
+df_rf_selected_test <- df_rf_selected[-train_ind, ]
+
+df_rf_selected_predict <- randomForest(re_rain_01 ~., df_rf_selected_train, mtry=2)
+
+plot(df_rf_selected_predict)
+
+varImpPlot(df_rf_selected_predict, main = "ランダムフォレストによる変数重要度")
+```
+
+```{r}
+table(predict(df_rf_selected_predict, df_rf_selected_test[,-1]), df_rf_selected_test$re_rain_01)
+```
+
+```{r}
+table(df_rf_selected_test$re_rain_01)
+```
+
+
+```{r}
+df_rf %>%
+  ggplot(aes(yes_mean_moisture, yes_moment_max_wind_angle, color = re_rain_01)) +
+  geom_point()
+```
+
+```{r}
+df_rf %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_mean_hpa, color = re_rain_01), stat = "density")
+```
+
+```{r}
+df_rf %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_sun_hr, color = re_rain_01), stat = "density")
+```
+
+```{r}
+angle <- table(df_rf$yes_max_wind_angle, df_rf$yes_moment_max_wind_angle)
+
+heatmap(as.matrix(angle))
+```
+
+
+
+
+```{r}
+df_rf %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_mean_cloud, color = re_rain_01), stat = "density") +
+  xlab("平均雲量") +
+  #ylab("密度") +
+  ggtitle("降水有無別　平均雲量分布") +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  #scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_color_hue(name = "降水有無", labels = c("雨　無し", "雨　有り") )
+```
+
+```{r}
+df_rf %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_mean_moisture, color = re_rain_01), stat = "density") +
+  xlab("平均相対湿度") +
+  #ylab("密度") +
+  ggtitle("降水有無別　平均相対湿度分布") +
+  #scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  #scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_color_hue(name = "降水有無", labels = c("雨　無し", "雨　有り") )
+```
+
+```{r}
+df_rf %>%
+  group_by(yes_moment_max_wind_angle, re_rain_01) %>%
+  count() %>%
+  ggplot() +
+  geom_bar(aes(x = yes_moment_max_wind_angle, y = n, fill = re_rain_01), stat = "identity", position = "fill") +
+  coord_flip()
+```
+
+
+```{r}
+df_rf$yes_moment_max_wind_angle <- factor(df_rf$yes_moment_max_wind_angle, 
+                                                  levels=c( "東", "東北東", "北東", "北北東","北",
+                                                            "北北西","北西", "西北西","西","西南西",
+                                                            "南西","南南西","南","南南東","南東","東南東" ))
+
+df_rf %>%
+  group_by(yes_moment_max_wind_angle) %>%
+  count() %>%
+  ggplot() +
+  xlab("最大瞬間風速_風向き") +
+  ylab("日数") +
+  ggtitle("最大瞬間風速の風向き分布") +
+  geom_bar(aes(x = yes_moment_max_wind_angle, y = n), stat = "identity", position = "dodge") +
+  coord_flip()
+```
+
+```{r}
+df_rf_angle <- df_rf %>%
+  group_by(yes_moment_max_wind_angle) %>%
+  count()
+
+radial.plot(df_rf_angle$n, 
+            rp.type = "p", 
+            labels = df_rf_angle$yes_moment_max_wind_angle,
+            lty = 1 : 1,
+            lwd = 5, 
+            line.col = "gray",
+            poly.col = "gray",
+            show.grid.labels = TRUE,
+            grid.bg = "transparent",
+            main = "最大瞬間風速_風向き　日数分布")
+legend("topright", legend = rownames(caith.scale), col = 1 : 4, lty = 1 : 4, lwd = 3)
+```
+
+```{r}
+df_rf_wind3_0 <- df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin, re_rain_01) %>%
+  count() %>%
+  filter(yes_moment_max_wind_bin == "[0,10]") %>%
+  filter(re_rain_01 == 0)
+
+df_rf_wind3_1 <- df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin, re_rain_01) %>%
+  count() %>%
+  filter(yes_moment_max_wind_bin == "[0,10]") %>%
+  filter(re_rain_01 == 1)
+
+df_rf_wind3 <- cbind(df_rf_wind3_0, df_rf_wind3_1)
+df_rf_wind3$re_rain_per <- df_rf_wind3$n1 / df_rf_wind3$n
+
+df_rf_wind4_0 <- df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin, re_rain_01) %>%
+  count() %>%
+  filter(yes_moment_max_wind_bin == "(10,20]") %>%
+  filter(re_rain_01 == 0)
+
+df_rf_wind4_1 <- df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin, re_rain_01) %>%
+  count() %>%
+  filter(yes_moment_max_wind_bin == "(10,20]") %>%
+  filter(re_rain_01 == 1)
+
+df_rf_wind4 <- cbind(df_rf_wind4_0, df_rf_wind4_1)
+df_rf_wind4$re_rain_per <- df_rf_wind4$n1 / df_rf_wind4$n
+
+radial.plot(df_rf_wind3$re_rain_per,
+            rp.type = "p",
+            labels = df_rf_wind3$yes_moment_max_wind_angle,
+            lty = 1 : 4, lwd = 2, line.col = "lightblue",
+            show.grid.labels = TRUE,
+            main = "最大瞬間風速・風向き別　降水割合"
+            )
+par(new = TRUE)
+radial.plot(df_rf_wind4$re_rain_per,
+            rp.type = "p",
+            labels = df_rf_wind4$yes_moment_max_wind_angle,
+            lty = 1 : 4, lwd = 2, line.col = "blue",
+            grid.col = "transparent",
+            show.grid.labels = FALSE
+            )
+legend(x = 0.7, y = 0.7, legend = c("風速[0, 10]", "風速(10, 20]"), col = c("lightblue", "blue"), lty = c(1, 1), lwd = 2)
+```
+
+```{r}
+radial.plot(df_rf_wind3$re_rain_per,
+            rp.type = "p",
+            labels = df_rf_wind3$yes_moment_max_wind_angle,
+            lty = 1 : 4, lwd = 2, line.col = "lightblue",
+            show.grid.labels = TRUE,
+            main = "最大瞬間風速・風向き別　降水割合"
+            )
+par(new = TRUE)
+radial.plot(df_rf_wind4$re_rain_per,
+            rp.type = "p",
+            labels = df_rf_wind4$yes_moment_max_wind_angle,
+            lty = 1 : 4, lwd = 2, line.col = "blue",
+            show.grid.labels = FALSE
+            )
+
+polar_16 <- c("(1, 0)", "(1, 1/8π)", "(1, 1/4π)", "(1, 3/8π)", "(1, 1/2π)", "(1, 5/8π)", "(1, 3/4π)"
+              , "(1, 7/8π)", "(1, π)", "(1, 9/8π)", "(1, 5/4π)", "(1, 11/8π)", "(1, 3/2π)"
+              , "(1, 13/8π)", "(1, 7/4π)", "(1, 15/8π)")
+
+radial.plot(c(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0), labels = df_rf_wind3$yes_moment_max_wind_angle,
+            #radial.pos = 0,
+            line.col = "gray",
+            label.prop = 0.7,
+            show.grid.labels = FALSE,
+            main = "各方角の極座標配置")
+par(new = TRUE)
+radial.plot(c(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0), labels = polar_16,
+            #radial.pos = 0,
+            label.prop = 1.1,
+            line.col = "gray",
+            show.grid.labels = FALSE)
+
+```
+
+
+```{r}
+df_rf %>%
+  group_by(yes_moment_max_wind_angle, re_rain_01) %>%
+  count() %>%
+  ggplot() +
+  geom_bar(aes(x = yes_moment_max_wind_angle, y = n, fill = re_rain_01), stat = "identity", position = "dodge") +
+  coord_flip()
+```
+
+
+```{r}
+df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin, re_rain_01) %>%
+  count() %>%
+  ggplot() +
+  geom_point(aes(x = yes_moment_max_wind_angle, y = yes_moment_max_wind_bin, 
+                 size = n)) +
+  facet_grid(. ~ re_rain_01) +
+  coord_flip()
+```
+
+```{r}
+df_rf %>%
+  ggplot(aes(yes_moment_max_wind_bin, fill = re_rain_01)) +
+  geom_histogram(stat = "count", position = "dodge") +
+  coord_flip() +
+  facet_wrap(~ yes_moment_max_wind_angle, nrow = 4, ncol = 4)
+```
+
+```{r}
+df_rf_wind1 <- df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin) %>%
+  count()
+
+df_rf_wind2 <- df_rf %>%
+  group_by(yes_moment_max_wind_angle, yes_moment_max_wind_bin, re_rain_01) %>%
+  count()
+
+df_rf_wind <- merge(df_rf_wind1, df_rf_wind2, by = c("yes_moment_max_wind_angle", "yes_moment_max_wind_bin"), all = TRUE)
+
+df_rf_wind %>%
+  filter(n.x > 7) %>%
+  ggplot(aes(yes_moment_max_wind_bin, n.y, fill = re_rain_01)) +
+  geom_bar(stat = "identity", position = "fill") +
+  coord_flip() +
+  facet_wrap(~ yes_moment_max_wind_angle, nrow = 4, ncol = 4)
+```
+
+
+```{r}
+df_rf %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_moment_max_wind, color = re_rain_01), stat = "density")
+```
+
+```{r}
+df_rf %>%
+  filter(yes_moment_max_wind_angle == "北北西" | yes_moment_max_wind_angle == "南南西") %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_moment_max_wind, color = re_rain_01), stat = "density") +
+  xlab("最大瞬間風速") +
+  #ylab("密度") +
+  ggtitle("降水有無別　最大瞬間風速分布") +
+  #scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  #scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_color_hue(name = "降水有無", labels = c("雨　無し", "雨　有り") ) +
+  #coord_flip() +
+  facet_wrap(~ yes_moment_max_wind_angle, nrow = 1, ncol = 2)
+```
+
+
+
+
+```{r}
+df_rf %>%
+  filter(yes_moment_max_wind_angle == "北北西") %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_moment_max_wind, color = re_rain_01), stat = "density") +
+  xlab("最大瞬間風速") +
+  ylab("密度") +
+  ggtitle("降水有無別　最大瞬間風速分布　（風向き：北北西）") +
+  #scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  #scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_color_hue(name = "降水有無", labels = c("雨　無し", "雨　有り") )
+```
+
+```{r}
+df_rf %>%
+  filter(yes_moment_max_wind_angle == "南南東") %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_moment_max_wind, color = re_rain_01), stat = "density")
+```
+
+```{r}
+df_rf %>%
+  filter(yes_moment_max_wind_angle == "南南西") %>%
+  ggplot() +
+  geom_freqpoly(aes(yes_moment_max_wind, color = re_rain_01), stat = "density") +
+  xlab("最大瞬間風速") +
+  ylab("密度") +
+  ggtitle("降水有無別　最大瞬間風速分布　（風向き：南南西）") +
+  #scale_x_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  #scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, 0.1)) +
+  scale_color_hue(name = "降水有無", labels = c("雨　無し", "雨　有り") )
+```
+
+
+```{r}
+df_result_Jap <- df_result %>%
+  select(yes_mean_temp,
+         yes_rain_mm, yes_sun_hr, yes_mean_cloud,
+         yes_moment_max_wind,
+         yes_mean_hpa, yes_mean_moisture)
+
+names(df_result_Jap) <- c("平均気温", "降水量_mm", "日照時間_hr", "平均雲量",
+                  "最大瞬間風速", "平均蒸気圧", "平均相対湿度")
+
+df_result_Jap %>%
+  cor() %>%
+  corrplot(method = "color", type = "lower", tl.srt = 30, addCoef.col = "darkgray", tl.col = "black",
+           tl.cex = 0.8, diag = FALSE)
+
+df_result_Jap %>%
+  cor() %>%
+  corrplot(method = "color", type = "lower", tl.srt = 30, addCoef.col = "darkgray", tl.col = "black",
+           tl.cex = 0.7, diag = FALSE, title = "")
+```
+
+
+```{r}
+df_rf_two <- df_result %>%
+  select(re_rain_01, yes_mean_temp, yes_max_temp, yes_max_temp_time, yes_min_temp, yes_min_temp_time,
+         yes_rain_mm, yes_rain_01, yes_sun_hr, yes_sun_01, yes_snow_cm, yes_snow_01, yes_mean_cloud,
+         yes_mean_wind, yes_max_wind, yes_max_wind_time,
+         yes_max_wind_angle, yes_moment_max_wind, yes_moment_max_wind_time, yes_moment_max_wind_angle,
+         yes_mean_hpa, yes_mean_moisture, yes_min_relative_moisture, yes_min_relative_moisture_time,
+         two_mean_temp, two_max_temp, two_max_temp_time, two_min_temp, two_min_temp_time,
+         two_rain_mm, two_rain_01, two_sun_hr, two_sun_01, two_snow_cm, two_snow_01, two_mean_cloud,
+         two_mean_wind, two_max_wind, two_max_wind_time,
+         two_max_wind_angle, two_moment_max_wind, two_moment_max_wind_time, two_moment_max_wind_angle,
+         two_mean_hpa, two_mean_moisture, two_min_relative_moisture, two_min_relative_moisture_time
+         )
+
+df_rf_two <- impute_lm(df_rf_two, yes_mean_wind ~ yes_max_wind + yes_rain_mm + yes_sun_hr + yes_mean_cloud + yes_mean_hpa)
+df_rf_two <- impute_lm(df_rf_two, two_mean_wind ~ two_max_wind + two_rain_mm + two_sun_hr + two_mean_cloud + two_mean_hpa)
+
+df_rf_two$re_rain_01 <- as.factor(df_rf_two$re_rain_01)
+df_rf_two$yes_rain_01 <- as.factor(df_rf_two$yes_rain_01)
+df_rf_two$yes_sun_01 <- as.factor(df_rf_two$yes_sun_01)
+df_rf_two$yes_snow_01 <- as.factor(df_rf_two$yes_snow_01)
+df_rf_two$yes_max_wind_angle <- as.factor(df_rf_two$yes_max_wind_angle)
+df_rf_two$yes_moment_max_wind_angle <- as.factor(df_rf_two$yes_moment_max_wind_angle)
+
+df_rf_two$two_rain_01 <- as.factor(df_rf_two$two_rain_01)
+df_rf_two$two_sun_01 <- as.factor(df_rf_two$two_sun_01)
+df_rf_two$two_snow_01 <- as.factor(df_rf_two$two_snow_01)
+df_rf_two$two_max_wind_angle <- as.factor(df_rf_two$two_max_wind_angle)
+df_rf_two$two_moment_max_wind_angle <- as.factor(df_rf_two$two_moment_max_wind_angle)
+
+df_rf_two$diff_mean_temp <- df_rf_two$yes_mean_temp - df_rf_two$two_mean_temp
+df_rf_two$diff_rain_mm <- df_rf_two$yes_rain_mm - df_rf_two$two_rain_mm
+df_rf_two$diff_sun_hr <- df_rf_two$yes_sun_hr - df_rf_two$two_sun_hr
+df_rf_two$diff_mean_cloud <- df_rf_two$yes_mean_cloud - df_rf_two$two_mean_cloud
+df_rf_two$diff_mean_wind <- (df_rf_two$yes_mean_wind - df_rf_two$two_mean_wind) / df_rf_two$two_mean_wind
+df_rf_two$diff_max_wind <- (df_rf_two$yes_max_wind - df_rf_two$two_max_wind) / df_rf_two$two_max_wind
+df_rf_two$diff_moment_max_wind <- (df_rf_two$yes_moment_max_wind - df_rf_two$two_moment_max_wind) / df_rf_two$two_moment_max_wind
+df_rf_two$diff_mean_hpa <- (df_rf_two$yes_mean_hpa - df_rf_two$two_mean_hpa) / df_rf_two$two_mean_hpa
+df_rf_two$diff_mean_moisture <- (df_rf_two$yes_mean_moisture - df_rf_two$two_mean_moisture) / df_rf_two$two_mean_moisture
+
+#df_rf_two$yes_moment_max_wind_angle_num <- ifelse(df_rf_two$yes_moment_max_wind_angle == "XX", "北",
+#                                      df_rf_two$yes_moment_max_wind_angle)
+
+#df_rf_two$two_moment_max_wind_angle_num <- ifelse(df_rf_two$two_moment_max_wind_angle == "XX", "北",
+#                                      df_rf_two$two_moment_max_wind_angle)
+
+#table(df_rf_two$yes_moment_max_wind_angle, df_rf_two$yes_moment_max_wind_angle_num)
+
+#方角の変化は、極座標を使って、円弧の長さを測る
+#風の強さも極座標化して、距離で測る？　⇒強まったか弱まったか判別できないので無し
+
+df_rf_two$yes_moment_max_wind_angle_polar <- ifelse(df_rf_two$yes_moment_max_wind_angle == "東", 0,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "東北東", 1/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "北東", 2/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "北北東", 3/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "北", 4/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "北北西", 5/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "北西", 6/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "西北西", 7/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "西", 8/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "西南西", 9/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "南西", 10/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "南南西", 11/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "南", 12/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "南南東", 13/8 * pi,
+                   ifelse(df_rf_two$yes_moment_max_wind_angle == "南東", 14/8 * pi, 15/8 * pi
+                          )))))))))))))))
+
+df_rf_two$two_moment_max_wind_angle_polar <- ifelse(df_rf_two$two_moment_max_wind_angle == "東", 0,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "東北東", 1/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "北東", 2/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "北北東", 3/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "北", 4/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "北北西", 5/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "北西", 6/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "西北西", 7/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "西", 8/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "西南西", 9/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "南西", 10/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "南南西", 11/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "南", 12/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "南南東", 13/8 * pi,
+                   ifelse(df_rf_two$two_moment_max_wind_angle == "南東", 14/8 * pi, 15/8 * pi
+                          )))))))))))))))
+
+df_rf_two$max_moment_max_wind_angle_polar <- 
+  apply(df_rf_two[, c("yes_moment_max_wind_angle_polar","two_moment_max_wind_angle_polar")], 1, max)
+
+df_rf_two$min_moment_max_wind_angle_polar <- 
+  apply(df_rf_two[, c("yes_moment_max_wind_angle_polar","two_moment_max_wind_angle_polar")], 1, min)
+
+df_rf_two$diff_moment_max_wind_angle_polar1 <- 
+  abs(df_rf_two$max_moment_max_wind_angle_polar - df_rf_two$min_moment_max_wind_angle_polar)
+
+df_rf_two$diff_moment_max_wind_angle_polar2 <-
+          abs((df_rf_two$max_moment_max_wind_angle_polar - 2 * pi) - df_rf_two$min_moment_max_wind_angle_polar)
+
+df_rf_two$diff_moment_max_wind_angle_polar <-
+  apply(df_rf_two[, c("diff_moment_max_wind_angle_polar1","diff_moment_max_wind_angle_polar2")], 1, min)
+
+#df_rf_two %>%
+#  ggplot() +
+#  geom_boxplot(aes(re_rain_01, diff_moment_max_wind_angle_polar))
+
+df_rf_two %>%
+  ggplot() +
+  geom_freqpoly(aes(diff_moment_max_wind_angle_polar, color = re_rain_01), stat = "density")
+```
+
+
+```{r}
+df_rf_two <- df_rf_two %>%
+  select(re_rain_01, yes_mean_temp, yes_rain_mm, yes_rain_01, yes_sun_hr, yes_snow_cm, yes_snow_01,
+         yes_mean_cloud, yes_mean_wind, yes_max_wind, yes_max_wind_angle, yes_moment_max_wind,
+         yes_moment_max_wind_angle, yes_mean_hpa, yes_mean_moisture, 
+         diff_moment_max_wind_angle_polar
+         #diff_mean_temp, diff_rain_mm, diff_sun_hr,
+         #diff_mean_cloud, diff_mean_wind, diff_max_wind, diff_moment_max_wind, diff_mean_hpa, diff_mean_moisture
+         )
+
+names(df_rf_two) <- c("re_rain_01", "平均気温", "降水量_mm", "降水有無", "日照時間_hr",
+                  "降雪量_cm", "降雪有無", "平均雲量", "平均風速",
+                  "最大風速", "最大風速_風向き", "最大瞬間風速", "最大瞬間風速_風向き",
+                  "平均蒸気圧", "平均相対湿度", "最大瞬間風速_風向き変化")
+
+
+tuneRF(df_rf_two[, -1], df_rf_two[, 1], doBest=TRUE)
+
+set.seed(1234)
+smp_size_two <- floor(0.75 * nrow(df_rf_two))
+train_ind <- sample(seq_len(nrow(df_rf_two)), size = smp_size_two)
+
+df_rf_two_train <- df_rf_two[train_ind, ]
+df_rf_two_test <- df_rf_two[-train_ind, ]
+
+df_rf_two_predict <- randomForest(re_rain_01 ~., df_rf_two_train, mtry=3)
+
+plot(df_rf_two_predict)
+```
+
+```{r}
+varImpPlot(df_rf_two_predict, main = "ランダムフォレストによる変数重要度")
+```
+
+```{r}
+table(df_rf_two_test$re_rain_01, predict(df_rf_two_predict, df_rf_two_test[,-1]))
+```
+
+```{r}
+df_rf_two %>%
+  ggplot() +
+  geom_freqpoly(aes(diff_mean_moisture, color = re_rain_01), stat = "density")
+```
+
+```{r}
+df_rf_two %>%
+  ggplot() +
+  geom_freqpoly(aes(diff_mean_cloud, color = re_rain_01), stat = "density")
+```
+
+```{r}
+df_rf_two %>%
+  ggplot() +
+  geom_freqpoly(aes(diff_sun_hr, color = re_rain_01), stat = "density")
+```
+
+```{r}
+df_rf_two %>%
+  ggplot() +
+  geom_point(aes(diff_sun_hr, yes_sun_hr))
+```
+
+```{r}
+cor(df_rf_two$diff_sun_hr, df_rf_two$yes_sun_hr)
+```
+
+
+
